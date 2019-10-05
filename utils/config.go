@@ -31,7 +31,8 @@ type BgWorkerSetting struct {
 
 type MktsConfig struct {
 	RootDirectory              string
-	ListenPort                 string
+	ListenURL                  string
+	UtilitiesURL               string
 	Timezone                   *time.Location
 	Queryable                  bool
 	StopGracePeriod            time.Duration
@@ -40,6 +41,11 @@ type MktsConfig struct {
 	EnableRemove               bool
 	EnableLastKnown            bool
 	DisableVariableCompression bool
+	InitCatalog                bool
+	InitWALCache               bool
+	BackgroundSync             bool
+	WALBypass                  bool
+	ClusterMode                bool
 	StartTime                  time.Time
 	Triggers                   []*TriggerSetting
 	BgWorkers                  []*BgWorkerSetting
@@ -50,7 +56,9 @@ func (m *MktsConfig) Parse(data []byte) error {
 		err error
 		aux struct {
 			RootDirectory              string `yaml:"root_directory"`
+			ListenHost                 string `yaml:"listen_host"`
 			ListenPort                 string `yaml:"listen_port"`
+			UtilitiesURL               string `yaml:"utilities_url"`
 			Timezone                   string `yaml:"timezone"`
 			LogLevel                   string `yaml:"log_level"`
 			Queryable                  string `yaml:"queryable"`
@@ -60,6 +68,11 @@ func (m *MktsConfig) Parse(data []byte) error {
 			EnableRemove               string `yaml:"enable_remove"`
 			EnableLastKnown            string `yaml:"enable_last_known"`
 			DisableVariableCompression string `yaml:"disable_variable_compression"`
+			InitCatalog                string `yaml:"init_catalog"`
+			InitWALCache               string `yaml:"init_wal_cache"`
+			BackgroundSync             string `yaml:"background_sync"`
+			WALBypass                  string `yaml:"wal_bypass"`
+			ClusterMode                string `yaml:"cluster_mode"`
 			Triggers                   []struct {
 				Module string                 `yaml:"module"`
 				On     string                 `yaml:"on"`
@@ -168,8 +181,49 @@ func (m *MktsConfig) Parse(data []byte) error {
 			}
 		}
 	*/
+	m.InitCatalog = true
+	if aux.InitCatalog != "" {
+		m.InitCatalog, err = strconv.ParseBool(aux.InitCatalog)
+		if err != nil {
+			log.Error("Invalid value for InitCatalog")
+		}
+	}
+
+	m.InitWALCache = true
+	if aux.InitWALCache != "" {
+		m.InitWALCache, err = strconv.ParseBool(aux.InitWALCache)
+		if err != nil {
+			log.Error("Invalid value for InitWALCache")
+		}
+	}
+
+	m.BackgroundSync = true
+	if aux.BackgroundSync != "" {
+		m.BackgroundSync, err = strconv.ParseBool(aux.BackgroundSync)
+		if err != nil {
+			log.Error("Invalid value for BackgroundSync")
+		}
+	}
+
+	m.WALBypass = false
+	if aux.WALBypass != "" {
+		m.WALBypass, err = strconv.ParseBool(aux.WALBypass)
+		if err != nil {
+			log.Error("Invalid value for WALBypass")
+		}
+	}
+
+	m.ClusterMode = true
+	if aux.ClusterMode != "" {
+		m.ClusterMode, err = strconv.ParseBool(aux.ClusterMode)
+		if err != nil {
+			log.Error("Invalid value for ClusterMode")
+		}
+	}
+
 	m.RootDirectory = aux.RootDirectory
-	m.ListenPort = fmt.Sprintf(":%v", aux.ListenPort)
+	m.ListenURL = fmt.Sprintf("%v:%v", aux.ListenHost, aux.ListenPort)
+	m.UtilitiesURL = fmt.Sprintf("%v", aux.UtilitiesURL)
 
 	for _, trig := range aux.Triggers {
 		triggerSetting := &TriggerSetting{

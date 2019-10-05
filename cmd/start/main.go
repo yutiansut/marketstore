@@ -91,7 +91,13 @@ func executeStart(cmd *cobra.Command, args []string) error {
 	log.Info("initializing marketstore...")
 
 	//
-	executor.NewInstanceSetup(utils.InstanceConfig.RootDirectory, true, true, true)
+	executor.NewInstanceSetup(
+		utils.InstanceConfig.RootDirectory,
+		utils.InstanceConfig.InitCatalog,
+		utils.InstanceConfig.InitWALCache,
+		utils.InstanceConfig.BackgroundSync,
+		utils.InstanceConfig.WALBypass)
+
 	// New server.
 	server, _ := frontend.NewServer()
 
@@ -108,16 +114,18 @@ func executeStart(cmd *cobra.Command, args []string) error {
 	InitializeTriggers()
 	RunBgWorkers()
 
-	// Start utility endpoints.
-	log.Info("launching utility service...")
-	go frontend.Utilities(utils.InstanceConfig.ListenPort)
+	if utils.InstanceConfig.UtilitiesURL != "" {
+		// Start utility endpoints.
+		log.Info("launching utility service...")
+		go frontend.Utilities(utils.InstanceConfig.UtilitiesURL)
+	}
 
 	log.Info("enabling query access...")
 	atomic.StoreUint32(&frontend.Queryable, 1)
 
 	// Serve.
 	log.Info("launching tcp listener for all services...")
-	if err := http.ListenAndServe(utils.InstanceConfig.ListenPort, nil); err != nil {
+	if err := http.ListenAndServe(utils.InstanceConfig.ListenURL, nil); err != nil {
 		return fmt.Errorf("failed to start server - error: %s", err.Error())
 	}
 

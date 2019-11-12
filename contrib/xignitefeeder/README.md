@@ -21,6 +21,12 @@ bgworkers:
         #- XSAP # Sapporo Stock Exchange
         #- XFKA # Fukuoka Stock Exchange
         #- XTAM # Tokyo PRO Market
+      # Xignite feeder also retrieves data of Index Symbols (ex. ＴＯＰＩＸ（東証１部株価指数）) every day.
+      # To get target indices, index groups that the indices belong are necessary.
+      # (cf. https://www.marketdata-cloud.quick-co.jp/Products/QUICKIndexHistorical/Overview/ListSymbols )
+      index_groups:
+        - INDXJPX # JAPAN EXCHANGE GROUP
+        - IND_NIKKEI # NIKKEI INDICES
       # time when target symbols in the exchanges are updated everyday.
       # this time is also used for the historical data backfill (UTC)
       updatingHour: 21 #:00:00
@@ -89,6 +95,12 @@ bgworkers:
         enabled: false
         since: "2008-04-01"
         timeframe: "1D"
+      # In addition to the daily-chart backfill above,
+      # Xignite Feeder can feed 5-minute chart data of the target symbols for the past X business days. The data is stored to {symbol}/{timeframe}/OHLCV bucket (e.g. "1400/5Min/OHLCV" )
+      recentBackfill:
+        enabled: true
+        days: 7 # Xignite Feeder feeds the data for {days} business days
+        timeframe: "5Min"
 ```
 
 # Build

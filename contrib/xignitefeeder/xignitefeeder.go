@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/alpacahq/marketstore/utils"
 	"time"
@@ -37,9 +38,14 @@ func NewBgWorker(conf map[string]interface{}) (bgworker.BgWorker, error) {
 		config.OpenTime,
 		config.CloseTime)
 
-	// init Symbols Manager to update symbols in the target exchanges every day
-	sm := symbols.NewManager(apiClient, config.Exchanges)
-	timer.RunEveryDayAt(config.UpdatingHour, sm.UpdateSymbols)
+	ctx := context.Background()
+	// init Symbols Manager to...
+	// 1. update symbols in the target exchanges
+	// 2. update index symbols in the target index groups
+	// every day
+	sm := symbols.NewManager(apiClient, config.Exchanges, config.IndexGroups)
+	sm.Update()
+	timer.RunEveryDayAt(ctx, config.UpdatingHour, sm.Update)
 
 	// init QuotesRangeWriter to backfill daily chart data every day
 	if config.Backfill.Enabled {
@@ -49,7 +55,19 @@ func NewBgWorker(conf map[string]interface{}) (bgworker.BgWorker, error) {
 		}
 
 		bf := feed.NewBackfill(sm, apiClient, msqrw, time.Time(config.Backfill.Since))
-		timer.RunEveryDayAt(config.UpdatingHour, bf.Update)
+		bf.Update()
+		timer.RunEveryDayAt(ctx, config.UpdatingHour, bf.Update)
+	}
+
+	if config.RecentBackfill.Enabled {
+		msbw := &writer.BarWriterImpl{
+			MarketStoreWriter: &writer.MarketStoreWriterImpl{},
+			Timeframe:         config.RecentBackfill.Timeframe,
+			Timezone:          utils.InstanceConfig.Timezone,
+		}
+		rbf := feed.NewRecentBackfill(sm, timeChecker, apiClient, msbw, config.RecentBackfill.Days)
+		rbf.Update()
+		timer.RunEveryDayAt(ctx, config.UpdatingHour, rbf.Update)
 	}
 
 	// init Quotes Writer
